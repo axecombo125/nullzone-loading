@@ -1,0 +1,281 @@
+<!doctype html>
+<!--
+  Nullzone RP loading screen.
+  GMod shows this page while a player joins (server.cfg: sv_loadingurl "<where it is hosted>").
+  The game calls the functions at the bottom (GameDetails, SetStatusChanged, SetFilesTotal,
+  SetFilesNeeded, DownloadingFile) to say what it is doing; the page shows that as the bar
+  and the line under it. Opened in an ordinary browser it plays a pretend load instead, so
+  it can be looked at.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Nullzone RP</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;800&display=swap" rel="stylesheet">
+<style>
+	:root {
+		--back: #0b0b10;
+		--panel: rgba(20, 20, 25, 0.82);
+		--edge: #34343f;
+		--text: #f2f2f5;
+		--sub: #9a9eae;
+		--faint: #5e6274;
+		--accent: #5ca4ff;
+		--accent2: #4ad68a;
+	}
+
+	* { box-sizing: border-box; margin: 0; padding: 0; }
+
+	html, body {
+		width: 100%; height: 100%;
+		overflow: hidden;
+		background: var(--back);
+		color: var(--text);
+		font-family: "Montserrat", sans-serif;
+	}
+
+	/* the void behind everything: a slow drifting grid, a soft light, and specks */
+	#void { position: fixed; inset: 0; }
+	.glow {
+		position: fixed; inset: 0;
+		background:
+			radial-gradient(ellipse 60% 50% at 50% 42%, rgba(92, 164, 255, 0.16), transparent 70%),
+			radial-gradient(ellipse 90% 70% at 50% 110%, rgba(74, 214, 138, 0.08), transparent 70%);
+	}
+	.grid {
+		position: fixed; inset: -50%;
+		background-image:
+			linear-gradient(rgba(92, 164, 255, 0.07) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(92, 164, 255, 0.07) 1px, transparent 1px);
+		background-size: 64px 64px;
+		transform: perspective(800px) rotateX(62deg) translateY(0);
+		animation: drift 18s linear infinite;
+		mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 30%, transparent 75%);
+		-webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 50%, #000 30%, transparent 75%);
+	}
+	@keyframes drift { to { transform: perspective(800px) rotateX(62deg) translateY(64px); } }
+	.vignette {
+		position: fixed; inset: 0;
+		background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.75));
+	}
+
+	/* the middle: name, tags, the bar */
+	main {
+		position: fixed; inset: 0;
+		display: flex; flex-direction: column; align-items: center; justify-content: center;
+		padding: 0 24px;
+		text-align: center;
+	}
+	.title {
+		font-size: clamp(48px, 9vw, 118px);
+		font-weight: 800;
+		letter-spacing: 0.12em;
+		line-height: 1;
+		text-shadow: 0 0 40px rgba(92, 164, 255, 0.35);
+	}
+	.title span { color: var(--accent); }
+	.tags {
+		margin-top: 18px;
+		display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+	}
+	.tag {
+		padding: 6px 14px;
+		border: 1px solid var(--edge);
+		border-radius: 999px;
+		background: var(--panel);
+		font-size: 13px; font-weight: 600; letter-spacing: 0.08em;
+		color: var(--sub);
+		text-transform: uppercase;
+	}
+
+	.loader {
+		margin-top: 56px;
+		width: min(620px, 100%);
+	}
+	.bar {
+		height: 8px;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.06);
+		border: 1px solid var(--edge);
+		overflow: hidden;
+	}
+	.fill {
+		height: 100%; width: 0%;
+		border-radius: 999px;
+		background: linear-gradient(90deg, var(--accent), var(--accent2));
+		box-shadow: 0 0 16px rgba(92, 164, 255, 0.6);
+		transition: width 0.4s ease;
+	}
+	.status {
+		margin-top: 12px;
+		display: flex; justify-content: space-between; gap: 16px;
+		font-size: 13px; color: var(--sub);
+	}
+	.status #state { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+	.status #percent { color: var(--text); font-weight: 600; }
+
+	/* the tip under the bar, changing every few seconds */
+	.tip {
+		margin-top: 40px;
+		min-height: 48px;
+		max-width: 620px;
+		font-size: 15px; color: var(--sub);
+		transition: opacity 0.5s ease;
+	}
+	.tip b { color: var(--text); font-weight: 600; }
+	.tip .label {
+		display: block; margin-bottom: 6px;
+		font-size: 11px; font-weight: 600; letter-spacing: 0.18em; color: var(--faint);
+	}
+
+	/* the corners: the map bottom left, the server's slots bottom right */
+	.corner {
+		position: fixed; bottom: 28px;
+		font-size: 13px; color: var(--faint);
+		letter-spacing: 0.06em;
+	}
+	.corner.left { left: 32px; text-align: left; }
+	.corner.right { right: 32px; text-align: right; }
+	.corner b { display: block; margin-top: 4px; font-size: 15px; color: var(--sub); font-weight: 600; letter-spacing: 0; }
+</style>
+</head>
+<body>
+	<canvas id="void"></canvas>
+	<div class="glow"></div>
+	<div class="grid"></div>
+	<div class="vignette"></div>
+
+	<main>
+		<div class="title">NULL<span>ZONE</span></div>
+		<div class="tags">
+			<div class="tag">PvP DarkRP</div>
+			<div class="tag">Gasters</div>
+			<div class="tag">Unboxing</div>
+			<div class="tag">Printers</div>
+		</div>
+
+		<div class="loader">
+			<div class="bar"><div class="fill" id="fill"></div></div>
+			<div class="status"><span id="state">Connecting...</span><span id="percent">0%</span></div>
+		</div>
+
+		<div class="tip" id="tip"></div>
+	</main>
+
+	<div class="corner left">MAP<b id="map">-</b></div>
+	<div class="corner right">SLOTS<b id="who">-</b></div>
+
+<script>
+	// ---------------------------------------------------------------- the tips
+	var TIPS = [
+		"Hold <b>C</b> to open your inventory.",
+		"Press <b>F4</b> to pick a job or buy weapons and ammo.",
+		"Double click an item to equip it. Right click it for everything else.",
+		"Type <b>/invholster</b> to put the gun in your hands back in your inventory.",
+		"Type <b>/suitholster</b> to take your suit off.",
+		"Anything you have equipped is <b>lost when you die</b>. Fight carefully.",
+		"Right click a suit or a gun to <b>upgrade</b> it. Every upgrade adds 5-10%.",
+		"Set up <b>loadouts</b> in your inventory, then press <b>1-5</b> to equip one.",
+		"Watch out for <b>event crates</b>. Shoot them open and grab the loot.",
+		"Type <b>!guide</b> in chat if you are new.",
+		"Hold <b>TAB</b> to see who is online."
+	];
+	var tipEl = document.getElementById("tip");
+	var tipAt = Math.floor(Math.random() * TIPS.length);
+	function ShowTip() {
+		tipEl.style.opacity = 0;
+		setTimeout(function () {
+			tipEl.innerHTML = '<span class="label">TIP</span>' + TIPS[tipAt];
+			tipEl.style.opacity = 1;
+			tipAt = (tipAt + 1) % TIPS.length;
+		}, 500);
+	}
+	ShowTip();
+	setInterval(ShowTip, 6000);
+
+	// ---------------------------------------------------------------- the void: drifting specks
+	var canvas = document.getElementById("void");
+	var ctx = canvas.getContext("2d");
+	var specks = [];
+	function Size() {
+		canvas.width = window.innerWidth;
+		canvas.height = window.innerHeight;
+	}
+	window.addEventListener("resize", Size);
+	Size();
+	for (var i = 0; i < 90; i++) {
+		specks.push({
+			x: Math.random(), y: Math.random(),
+			r: Math.random() * 1.6 + 0.3,
+			v: Math.random() * 0.00025 + 0.00005,
+			a: Math.random() * 0.5 + 0.15
+		});
+	}
+	function Draw() {
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		for (var i = 0; i < specks.length; i++) {
+			var s = specks[i];
+			s.y -= s.v;
+			if (s.y < -0.02) { s.y = 1.02; s.x = Math.random(); }
+			ctx.beginPath();
+			ctx.arc(s.x * canvas.width, s.y * canvas.height, s.r, 0, Math.PI * 2);
+			ctx.fillStyle = "rgba(160, 200, 255," + s.a + ")";
+			ctx.fill();
+		}
+		requestAnimationFrame(Draw);
+	}
+	Draw();
+
+	// ---------------------------------------------------------------- the bar
+	var total = 0, needed = 0, real = false;
+	var fill = document.getElementById("fill");
+	var percentEl = document.getElementById("percent");
+	var stateEl = document.getElementById("state");
+
+	function SetPercent(p) {
+		p = Math.max(0, Math.min(100, Math.round(p)));
+		fill.style.width = p + "%";
+		percentEl.textContent = p + "%";
+	}
+	function Update() {
+		if (total > 0) SetPercent((total - needed) / total * 100);
+	}
+
+	// ---------------------------------------------------------------- what the game calls
+	function GameDetails(servername, serverurl, mapname, maxplayers, steamid, gamemode) {
+		real = true;
+		document.getElementById("map").textContent = mapname || "-";
+		document.getElementById("who").textContent = maxplayers || "-";
+	}
+	function SetFilesTotal(t) { real = true; total = t; Update(); }
+	function SetFilesNeeded(n) { real = true; needed = n; Update(); }
+	function DownloadingFile(name) {
+		real = true;
+		stateEl.textContent = "Downloading " + String(name).split("/").pop();
+	}
+	function SetStatusChanged(status) {
+		real = true;
+		stateEl.textContent = status;
+		// the last steps come after the downloads; the bar finishes off through them
+		if (/workshop/i.test(status)) SetPercent(Math.max(10, parseInt(percentEl.textContent)));
+		if (/lua/i.test(status)) SetPercent(Math.max(85, parseInt(percentEl.textContent)));
+		if (/sending client info/i.test(status) || /starting lua/i.test(status)) SetPercent(100);
+	}
+
+	// ---------------------------------------------------------------- outside the game
+	// a pretend load, so the page can be looked at in a normal browser
+	setTimeout(function () {
+		if (real) return;
+		document.getElementById("map").textContent = "rp_downtown_tits_v2";
+		var p = 0;
+		var steps = ["Retrieving server info", "Mounting workshop addons", "Downloading content", "Loading Lua", "Sending client info"];
+		var timer = setInterval(function () {
+			p += Math.random() * 6;
+			if (p >= 100) { p = 0; }
+			SetPercent(p);
+			stateEl.textContent = steps[Math.min(steps.length - 1, Math.floor(p / 20))] + "...";
+		}, 350);
+	}, 1500);
+</script>
+</body>
+</html>
